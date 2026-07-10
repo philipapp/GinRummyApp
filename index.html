@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Gin Rummy Punkte</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gin Rummy">
+<meta name="theme-color" content="#0b0c10">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="favicon.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #0b0c10;
+    --card: #1a1c22;
+    --card-2: #22242c;
+    --accent: #30d158;
+    --text: #f5f5f7;
+    --text-dim: #9a9ba3;
+    --danger: #ff453a;
+    --gold: #ffd60a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    padding-top: max(24px, env(safe-area-inset-top));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 4px 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 20px;
+    font-weight: 600;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h3 {
+    margin: 0 0 14px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  input {
+    width: 100%;
+    background: var(--card-2);
+    border: none;
+    border-radius: 12px;
+    padding: 14px 14px;
+    font-size: 17px;
+    color: var(--text);
+    outline: none;
+  }
+  input:focus { box-shadow: 0 0 0 2px var(--accent); }
+  button {
+    width: 100%;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #04170a;
+    margin-top: 4px;
+  }
+  .btn-primary:active { opacity: 0.8; }
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid rgba(255,69,58,0.4);
+    margin-top: 10px;
+  }
+  .btn-danger:active { opacity: 0.7; }
+  .btn-edit {
+    width: auto;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--card-2);
+    color: var(--text-dim);
+    border-radius: 10px;
+  }
+  .btn-edit:active { opacity: 0.7; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .stat .val { font-size: 20px; font-weight: 700; }
+  .stat .lbl { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .stat.leader .val { color: var(--gold); }
+  .empty { color: var(--text-dim); text-align: center; padding: 30px 0; font-size: 15px; }
+  section h2 {
+    font-size: 15px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 24px 0 10px;
+  }
+  .entry-card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #262832;
+  }
+  .entry-header .date { font-size: 13px; color: var(--text-dim); }
+  .entry-header .titel { font-size: 15px; font-weight: 700; }
+  .entry-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px 10px;
+  }
+  .entry-grid .item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .entry-grid .item span { color: var(--text-dim); font-size: 12px; }
+  .entry-grid .item b { font-weight: 700; font-size: 16px; }
+  .result-card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 20px 18px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  .result-card .trophy { font-size: 40px; margin-bottom: 6px; }
+  .result-card h3 { margin: 0 0 16px; font-size: 18px; }
+  .rangliste { text-align: left; margin-bottom: 8px; }
+  .rang-zeile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 4px;
+    border-bottom: 1px solid #262832;
+    font-size: 15px;
+  }
+  .rang-zeile:last-child { border-bottom: none; }
+  .rang-zeile .platz { color: var(--text-dim); width: 30px; }
+  .rang-zeile .name { flex: 1; font-weight: 600; }
+  .rang-zeile .punkte { font-weight: 700; }
+  .rang-zeile.erster .name, .rang-zeile.erster .punkte { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<h1>🃏 Gin Rummy</h1>
+<div class="subtitle" id="subtitle"></div>
+
+<div class="stats" id="stats"></div>
+
+<div id="formBereich"></div>
+
+<section>
+  <h2>Runden</h2>
+  <div id="rundenListe"></div>
+</section>
+
+<div id="resetBereich"></div>
+
+<section>
+  <h2>Verlauf</h2>
+  <div id="historie"></div>
+</section>
+<div id="historieAktionen"></div>
+
+<script>
+const SPIELER = ["Kieron", "Staben", "Philip"];
+const RUNDEN_ZIEL = 10;
+const SPIEL_KEY = "ginAktuellesSpiel";
+const HISTORIE_KEY = "ginHistorie";
+
+function ladenSpiel() {
+  const daten = JSON.parse(localStorage.getItem(SPIEL_KEY) || "null");
+  return daten && Array.isArray(daten.rounds) ? daten : { rounds: [] };
+}
+function speichernSpiel(spiel) {
+  localStorage.setItem(SPIEL_KEY, JSON.stringify(spiel));
+}
+function ladenHistorie() {
+  return JSON.parse(localStorage.getItem(HISTORIE_KEY) || "[]");
+}
+function speichernHistorie(h) {
+  localStorage.setItem(HISTORIE_KEY, JSON.stringify(h));
+}
+
+function berechneTotals(rounds) {
+  const totals = {};
+  SPIELER.forEach(s => totals[s] = 0);
+  rounds.forEach(r => SPIELER.forEach(s => totals[s] += r[s]));
+  return totals;
+}
+
+// Wenig Punkte = gut. Standard-Rangfolge (Gleichstand teilt sich den Platz).
+function berechneRangliste(totals) {
+  const sortiert = SPIELER
+    .map(name => ({ name, total: totals[name] }))
+    .sort((a, b) => a.total - b.total);
+  let platz = 1;
+  sortiert.forEach((eintrag, i) => {
+    if (i > 0 && eintrag.total === sortiert[i - 1].total) {
+      eintrag.platz = sortiert[i - 1].platz;
+    } else {
+      eintrag.platz = i + 1;
+    }
+  });
+  return sortiert;
+}
+
+function medaille(platz) {
+  return platz === 1 ? "🥇" : platz === 2 ? "🥈" : platz === 3 ? "🥉" : "";
+}
+
+function istGueltigePunktzahl(text) {
+  return /^\d+$/.test(text.trim());
+}
+
+function rundeSpeichern() {
+  const werte = {};
+  for (const name of SPIELER) {
+    const roh = document.getElementById("input-" + name).value;
+    if (!istGueltigePunktzahl(roh)) {
+      alert(`Bitte für ${name} eine gültige Punktzahl (0 oder größer) eingeben.`);
+      return;
+    }
+    werte[name] = parseInt(roh.trim(), 10);
+  }
+
+  const spiel = ladenSpiel();
+  spiel.rounds.push(werte);
+  speichernSpiel(spiel);
+  render();
+}
+
+function rundeBearbeiten(index) {
+  const spiel = ladenSpiel();
+  const runde = spiel.rounds[index];
+  const neu = {};
+
+  for (const name of SPIELER) {
+    const eingabe = prompt(`${name} – Punkte für Runde ${index + 1}:`, runde[name].toString());
+    if (eingabe === null) return;
+    if (!istGueltigePunktzahl(eingabe)) {
+      alert(`Ungültige Punktzahl für ${name}.`);
+      return;
+    }
+    neu[name] = parseInt(eingabe.trim(), 10);
+  }
+
+  spiel.rounds[index] = neu;
+  speichernSpiel(spiel);
+  render();
+}
+
+function spielZuruecksetzen() {
+  if (confirm("Aktuelles Spiel wirklich zurücksetzen? Es wird nicht im Verlauf gespeichert.")) {
+    speichernSpiel({ rounds: [] });
+    render();
+  }
+}
+
+function neuesSpielStarten() {
+  const spiel = ladenSpiel();
+  const totals = berechneTotals(spiel.rounds);
+  const rangliste = berechneRangliste(totals);
+
+  const historie = ladenHistorie();
+  historie.unshift({
+    datum: new Date().toLocaleDateString("de-DE"),
+    rounds: spiel.rounds,
+    totals,
+    rangliste
+  });
+  speichernHistorie(historie);
+  speichernSpiel({ rounds: [] });
+  render();
+}
+
+function historieLoeschen() {
+  if (confirm("Wirklich den gesamten Verlauf löschen?")) {
+    speichernHistorie([]);
+    render();
+  }
+}
+
+function render() {
+  const spiel = ladenSpiel();
+  const rounds = spiel.rounds;
+  const fertig = rounds.length >= RUNDEN_ZIEL;
+  const totals = berechneTotals(rounds);
+  const rangliste = berechneRangliste(totals);
+
+  document.getElementById("subtitle").textContent = fertig
+    ? "Spiel beendet – 10 von 10 Runden"
+    : `Runde ${rounds.length + 1} von ${RUNDEN_ZIEL}`;
+
+  // Stats
+  const statsEl = document.getElementById("stats");
+  const fuehrender = rounds.length > 0 ? Math.min(...rangliste.map(r => r.platz)) : null;
+  statsEl.innerHTML = SPIELER.map(name => {
+    const eintrag = rangliste.find(r => r.name === name);
+    const istFuehrend = rounds.length > 0 && eintrag.platz === 1;
+    return `
+      <div class="stat ${istFuehrend ? "leader" : ""}">
+        <div class="val">${totals[name]}</div>
+        <div class="lbl">${name}${istFuehrend ? " 👑" : ""}</div>
+      </div>`;
+  }).join("");
+
+  // Formular oder Ergebnis
+  const formEl = document.getElementById("formBereich");
+  if (!fertig) {
+    formEl.innerHTML = `
+      <div class="card">
+        <h3>Punkte für Runde ${rounds.length + 1}</h3>
+        ${SPIELER.map(name => `
+          <div class="field">
+            <label>${name}</label>
+            <input id="input-${name}" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
+          </div>
+        `).join("")}
+        <button class="btn-primary" onclick="rundeSpeichern()">Speichern</button>
+      </div>
+    `;
+  } else {
+    formEl.innerHTML = `
+      <div class="result-card">
+        <div class="trophy">🏆</div>
+        <h3>Spiel beendet!</h3>
+        <div class="rangliste">
+          ${rangliste.map(r => `
+            <div class="rang-zeile ${r.platz === 1 ? "erster" : ""}">
+              <div class="platz">${medaille(r.platz) || (r.platz + ".")}</div>
+              <div class="name">${r.name}</div>
+              <div class="punkte">${r.total} Pkt.</div>
+            </div>
+          `).join("")}
+        </div>
+        <button class="btn-primary" onclick="neuesSpielStarten()">Neues Spiel starten</button>
+      </div>
+    `;
+  }
+
+  // Runden-Liste
+  const rundenEl = document.getElementById("rundenListe");
+  if (rounds.length === 0) {
+    rundenEl.innerHTML = `<div class="empty">Noch keine Runde eingetragen.</div>`;
+  } else {
+    rundenEl.innerHTML = [...rounds].map((r, i) => i).reverse().map(i => {
+      const r = rounds[i];
+      return `
+        <div class="entry-card">
+          <div class="entry-header">
+            <div class="titel">Runde ${i + 1}</div>
+            <button class="btn-edit" onclick="rundeBearbeiten(${i})">✎ Bearbeiten</button>
+          </div>
+          <div class="entry-grid">
+            ${SPIELER.map(name => `
+              <div class="item"><span>${name}</span><b>${r[name]}</b></div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // Reset-Bereich
+  const resetEl = document.getElementById("resetBereich");
+  resetEl.innerHTML = rounds.length > 0
+    ? `<button class="btn-danger" onclick="spielZuruecksetzen()">Aktuelles Spiel zurücksetzen</button>`
+    : "";
+
+  // Verlauf
+  const historie = ladenHistorie();
+  const histEl = document.getElementById("historie");
+  if (historie.length === 0) {
+    histEl.innerHTML = `<div class="empty">Noch keine abgeschlossenen Spiele.</div>`;
+  } else {
+    histEl.innerHTML = historie.map(spiel => `
+      <div class="entry-card">
+        <div class="entry-header">
+          <div class="titel">🏆 ${spiel.rangliste[0].name}</div>
+          <div class="date">${spiel.datum}</div>
+        </div>
+        <div class="entry-grid">
+          ${spiel.rangliste.map(r => `
+            <div class="item"><span>${medaille(r.platz)} ${r.name}</span><b>${r.total}</b></div>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  const histAktionenEl = document.getElementById("historieAktionen");
+  histAktionenEl.innerHTML = historie.length > 0
+    ? `<button class="btn-danger" onclick="historieLoeschen()">Verlauf löschen</button>`
+    : "";
+}
+
+render();
+</script>
+
+</body>
+</html>
