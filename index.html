@@ -257,6 +257,12 @@
   }
   .anleitung-liste li { margin-bottom: 10px; }
   .anleitung-liste li:last-child { margin-bottom: 0; }
+  .hinweis {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: 0 0 16px;
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
@@ -310,6 +316,7 @@ const MAX_SPIELER = 6;
 const SPIEL_KEY = "ginAktuellesSpiel";
 const HISTORIE_KEY = "ginHistorie";
 const SETUP_KEY = "ginSpielerSetup";
+const SITZUNG_KEY = "ginSitzungBestaetigt";
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, ch => ({
@@ -317,14 +324,28 @@ function escapeHtml(str) {
   }[ch]));
 }
 
-// Es zählt nur als laufendes Spiel, wenn explizit Spieler eingerichtet wurden.
-// Ohne das (z.B. beim allerersten Start) wird immer das Setup verlangt.
+// Merkt sich per sessionStorage (nicht localStorage!), dass für DIESE
+// Browser-Sitzung schon bestätigt wurde, mit wem gespielt wird. So wird beim
+// erneuten Öffnen der App (neue Sitzung, z.B. am nächsten Tag) immer wieder
+// nach Spieleranzahl/Namen gefragt – aber ein Reload innerhalb derselben
+// Sitzung unterbricht die gerade begonnene Runde 1 nicht.
+function istSitzungBestaetigt() {
+  return sessionStorage.getItem(SITZUNG_KEY) === "true";
+}
+function sitzungBestaetigen() {
+  sessionStorage.setItem(SITZUNG_KEY, "true");
+}
+
+// Ein Spiel gilt erst als "gestartet", wenn mindestens eine Runde eingetragen
+// wurde (dann läuft es eindeutig) oder die aktuelle Sitzung das explizit
+// bestätigt hat. Sonst wird immer erst die Vorspiel-Auswahl/Setup gezeigt.
 function ladenSpiel() {
   const roh = JSON.parse(localStorage.getItem(SPIEL_KEY) || "null");
   if (!roh || !Array.isArray(roh.rounds) || !Array.isArray(roh.players) || roh.players.length === 0) {
-    return { players: [], rounds: [] };
+    return { players: [], rounds: [], gestartet: false };
   }
-  return roh;
+  const gestartet = roh.rounds.length > 0 || istSitzungBestaetigt();
+  return { players: roh.players, rounds: roh.rounds, gestartet };
 }
 function speichernSpiel(spiel) {
   localStorage.setItem(SPIEL_KEY, JSON.stringify(spiel));
@@ -383,6 +404,22 @@ function clampAnzahl(wert) {
 
 // ---- Spieler-Einrichtung ----
 
+// Überspringt einmalig die Vorspiel-Auswahl und zeigt direkt das volle
+// Einrichten-Formular (z.B. nachdem "Neue Spieler einrichten" angeklickt wurde).
+let zeigeSofortFormular = false;
+
+function vorspielWeiterMitLetzten() {
+  const setup = ladenSetup();
+  speichernSpiel({ players: setup.players, rounds: [] });
+  sitzungBestaetigen();
+  render();
+}
+
+function vorspielNeueSpieler() {
+  zeigeSofortFormular = true;
+  render();
+}
+
 function setupNamenAktualisieren(vorbelegung) {
   const anzahlInput = document.getElementById("setupAnzahl");
   const anzahl = clampAnzahl(anzahlInput.value);
@@ -414,12 +451,14 @@ function setupSpielStarten() {
   }
   speichernSetup({ players: namen });
   speichernSpiel({ players: namen, rounds: [] });
+  sitzungBestaetigen();
   render();
 }
 
 function spielerAendernMitten() {
   if (confirm("Laufendes Spiel verwerfen und Spieler/Anzahl neu einrichten? Der Fortschritt geht verloren und wird nicht im Verlauf gespeichert.")) {
     speichernSpiel({ players: [], rounds: [] });
+    zeigeSofortFormular = true;
     render();
   }
 }
@@ -491,6 +530,7 @@ function neuesSpielGleicheSpieler() {
   const spiel = ladenSpiel();
   archivSpiel(spiel);
   speichernSpiel({ players: spiel.players, rounds: [] });
+  sitzungBestaetigen();
   render();
 }
 
@@ -498,6 +538,7 @@ function neueSpielerEinrichten() {
   const spiel = ladenSpiel();
   archivSpiel(spiel);
   speichernSpiel({ players: [], rounds: [] });
+  zeigeSofortFormular = true;
   render();
 }
 
@@ -522,14 +563,34 @@ function anleitungSchliessenBeiOverlay(event) {
 
 // ---- Rendering ----
 
-function renderSetup() {
-  document.getElementById("subtitle").textContent = "Neues Spiel einrichten";
-
+function renderVorspiel() {
   const statsEl = document.getElementById("stats");
   statsEl.style.display = "none";
   statsEl.innerHTML = "";
+  document.getElementById("rundenSection").style.display = "none";
+  document.getElementById("resetBereich").innerHTML = "";
 
   const setup = ladenSetup();
+  const hatLetzteSpieler = setup.players.some(n => n.trim() !== "");
+
+  if (hatLetzteSpieler && !zeigeSofortFormular) {
+    document.getElementById("subtitle").textContent = "Neues Spiel";
+    document.getElementById("formBereich").innerHTML = `
+      <div class="card">
+        <h3>Bereit für ein neues Spiel?</h3>
+        <p class="hinweis">Zuletzt gespielt: ${escapeHtml(setup.players.join(", "))}</p>
+        <button class="btn-primary" onclick="vorspielWeiterMitLetzten()">Weiter mit diesen Spielern</button>
+        <button class="btn-secondary" onclick="vorspielNeueSpieler()">Neue Spieler einrichten</button>
+      </div>
+    `;
+  } else {
+    renderSetupFormular(setup.players);
+  }
+  zeigeSofortFormular = false;
+}
+
+function renderSetupFormular(vorbelegungNamen) {
+  document.getElementById("subtitle").textContent = "Neues Spiel einrichten";
   const formEl = document.getElementById("formBereich");
   formEl.innerHTML = `
     <div class="card">
@@ -537,16 +598,13 @@ function renderSetup() {
       <div class="field">
         <label>Anzahl Spieler (${MIN_SPIELER}–${MAX_SPIELER})</label>
         <input id="setupAnzahl" type="number" inputmode="numeric" min="${MIN_SPIELER}" max="${MAX_SPIELER}" step="1"
-               value="${setup.players.length || MIN_SPIELER}" oninput="setupNamenAktualisieren()">
+               value="${vorbelegungNamen.length || MIN_SPIELER}" oninput="setupNamenAktualisieren()">
       </div>
       <div id="setupNamen"></div>
       <button class="btn-primary" onclick="setupSpielStarten()">Spiel starten</button>
     </div>
   `;
-  setupNamenAktualisieren(setup.players);
-
-  document.getElementById("rundenSection").style.display = "none";
-  document.getElementById("resetBereich").innerHTML = "";
+  setupNamenAktualisieren(vorbelegungNamen);
 }
 
 function renderSpiel(spiel) {
@@ -670,8 +728,8 @@ function renderHistorie() {
 
 function render() {
   const spiel = ladenSpiel();
-  if (!spiel.players || spiel.players.length === 0) {
-    renderSetup();
+  if (!spiel.gestartet) {
+    renderVorspiel();
   } else {
     renderSpiel(spiel);
   }
