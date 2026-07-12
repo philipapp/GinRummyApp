@@ -37,6 +37,12 @@
     padding-right: max(16px, env(safe-area-inset-right));
     min-height: 100vh;
   }
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
   h1 {
     font-size: 28px;
     font-weight: 700;
@@ -45,6 +51,18 @@
     align-items: center;
     gap: 8px;
   }
+  .btn-help {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--card-2);
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .btn-help:active { opacity: 0.7; }
   .subtitle {
     color: var(--text-dim);
     font-size: 14px;
@@ -97,6 +115,13 @@
     margin-top: 4px;
   }
   .btn-primary:active { opacity: 0.8; }
+  .btn-secondary {
+    background: var(--card-2);
+    color: var(--text);
+    border: 1px solid #33353d;
+    margin-top: 10px;
+  }
+  .btn-secondary:active { opacity: 0.7; }
   .btn-danger {
     background: transparent;
     color: var(--danger);
@@ -116,7 +141,7 @@
   .btn-edit:active { opacity: 0.7; }
   .stats {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
     gap: 10px;
     margin-bottom: 16px;
   }
@@ -155,7 +180,7 @@
   .entry-header .titel { font-size: 15px; font-weight: 700; }
   .entry-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
     gap: 9px 10px;
   }
   .entry-grid .item {
@@ -188,18 +213,65 @@
   .rang-zeile .name { flex: 1; font-weight: 600; }
   .rang-zeile .punkte { font-weight: 700; }
   .rang-zeile.erster .name, .rang-zeile.erster .punkte { color: var(--gold); }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .overlay-card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 20px;
+    max-width: 420px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .overlay-header h3 { margin: 0; font-size: 18px; }
+  .btn-close {
+    width: auto;
+    padding: 6px 12px;
+    font-size: 14px;
+    background: var(--card-2);
+    color: var(--text);
+    border-radius: 10px;
+  }
+  .btn-close:active { opacity: 0.7; }
+  .anleitung-liste {
+    padding-left: 20px;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .anleitung-liste li { margin-bottom: 10px; }
+  .anleitung-liste li:last-child { margin-bottom: 0; }
 </style>
 </head>
 <body>
 
-<h1>🃏 Gin Rummy</h1>
+<div class="header-row">
+  <h1>🃏 Gin Rummy</h1>
+  <button class="btn-help" onclick="anleitungOeffnen()" aria-label="Anleitung anzeigen">?</button>
+</div>
 <div class="subtitle" id="subtitle"></div>
 
 <div class="stats" id="stats"></div>
 
 <div id="formBereich"></div>
 
-<section>
+<section id="rundenSection">
   <h2>Runden</h2>
   <div id="rundenListe"></div>
 </section>
@@ -212,15 +284,46 @@
 </section>
 <div id="historieAktionen"></div>
 
+<div id="anleitungOverlay" class="overlay" style="display:none" onclick="anleitungSchliessenBeiOverlay(event)">
+  <div class="overlay-card">
+    <div class="overlay-header">
+      <h3>Anleitung</h3>
+      <button class="btn-close" onclick="anleitungSchliessen()">Schließen</button>
+    </div>
+    <ol class="anleitung-liste">
+      <li>Zu Beginn gibst du an, wie viele Spieler mitspielen (2–6) und wie sie heißen.</li>
+      <li>Ein Spiel dauert 10 Runden. Nach jeder Runde trägst du für jeden Spieler den <b>Rest</b> ein – also die Punkte der Karten, die er noch auf der Hand hat.</li>
+      <li>Wer nach 10 Runden insgesamt die <b>wenigsten</b> Punkte hat, gewinnt.</li>
+      <li>Bereits eingetragene Runden lassen sich jederzeit über „✎ Bearbeiten“ korrigieren, falls du dich vertippt hast.</li>
+      <li>Nach der 10. Runde siehst du das Endergebnis und kannst entweder mit denselben Spielern weiterspielen oder neue Spieler bzw. eine andere Anzahl einrichten.</li>
+      <li>Mitten im Spiel lässt sich über „Spieler/Anzahl ändern“ auch neu einrichten, falls doch noch wer dazukommt – der laufende Fortschritt geht dabei verloren.</li>
+      <li>Abgeschlossene Spiele bleiben unten im Verlauf gespeichert.</li>
+    </ol>
+  </div>
+</div>
+
 <script>
-const SPIELER = ["Kieron", "Staben", "Philip"];
 const RUNDEN_ZIEL = 10;
+const MIN_SPIELER = 2;
+const MAX_SPIELER = 6;
+const STANDARD_SPIELER = ["Kieron", "Staben", "Philip"];
 const SPIEL_KEY = "ginAktuellesSpiel";
 const HISTORIE_KEY = "ginHistorie";
+const SETUP_KEY = "ginSpielerSetup";
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
 
 function ladenSpiel() {
-  const daten = JSON.parse(localStorage.getItem(SPIEL_KEY) || "null");
-  return daten && Array.isArray(daten.rounds) ? daten : { rounds: [] };
+  const roh = JSON.parse(localStorage.getItem(SPIEL_KEY) || "null");
+  if (!roh || !Array.isArray(roh.rounds)) return { players: [], rounds: [] };
+  if (Array.isArray(roh.players) && roh.players.length > 0) return roh;
+  // Migration: altes Format (vor Multi-Spieler-Update) ohne "players"-Feld
+  if (roh.rounds.length > 0) return { players: [...STANDARD_SPIELER], rounds: roh.rounds };
+  return { players: [], rounds: [] };
 }
 function speichernSpiel(spiel) {
   localStorage.setItem(SPIEL_KEY, JSON.stringify(spiel));
@@ -231,17 +334,25 @@ function ladenHistorie() {
 function speichernHistorie(h) {
   localStorage.setItem(HISTORIE_KEY, JSON.stringify(h));
 }
+function ladenSetup() {
+  const roh = JSON.parse(localStorage.getItem(SETUP_KEY) || "null");
+  if (roh && Array.isArray(roh.players) && roh.players.length > 0) return roh;
+  return { players: [...STANDARD_SPIELER] };
+}
+function speichernSetup(setup) {
+  localStorage.setItem(SETUP_KEY, JSON.stringify(setup));
+}
 
-function berechneTotals(rounds) {
+function berechneTotals(players, rounds) {
   const totals = {};
-  SPIELER.forEach(s => totals[s] = 0);
-  rounds.forEach(r => SPIELER.forEach(s => totals[s] += r[s]));
+  players.forEach(p => totals[p] = 0);
+  rounds.forEach(r => players.forEach(p => totals[p] += (r[p] || 0)));
   return totals;
 }
 
 // Wenig Punkte = gut. Standard-Rangfolge (Gleichstand teilt sich den Platz).
-function berechneRangliste(totals) {
-  const sortiert = SPIELER
+function berechneRangliste(players, totals) {
+  const sortiert = players
     .map(name => ({ name, total: totals[name] }))
     .sort((a, b) => a.total - b.total);
   let platz = 1;
@@ -263,18 +374,69 @@ function istGueltigePunktzahl(text) {
   return /^\d+$/.test(text.trim());
 }
 
+function clampAnzahl(wert) {
+  const n = parseInt(wert, 10);
+  if (isNaN(n)) return MIN_SPIELER;
+  return Math.min(MAX_SPIELER, Math.max(MIN_SPIELER, n));
+}
+
+// ---- Spieler-Einrichtung ----
+
+function setupNamenAktualisieren(vorbelegung) {
+  const anzahlInput = document.getElementById("setupAnzahl");
+  const anzahl = clampAnzahl(anzahlInput.value);
+  anzahlInput.value = anzahl;
+
+  const bestehende = vorbelegung || [...document.querySelectorAll(".setup-name-input")].map(i => i.value);
+  const namenEl = document.getElementById("setupNamen");
+  namenEl.innerHTML = "";
+  for (let i = 0; i < anzahl; i++) {
+    const val = bestehende[i] || "";
+    namenEl.insertAdjacentHTML("beforeend", `
+      <div class="field">
+        <label>Spieler ${i + 1}</label>
+        <input class="setup-name-input" type="text" maxlength="20" placeholder="Name eingeben" value="${escapeHtml(val)}">
+      </div>
+    `);
+  }
+}
+
+function setupSpielStarten() {
+  const namen = [...document.querySelectorAll(".setup-name-input")].map(i => i.value.trim());
+  if (namen.some(n => n === "")) {
+    alert("Bitte für alle Spieler einen Namen eingeben.");
+    return;
+  }
+  if (new Set(namen.map(n => n.toLowerCase())).size !== namen.length) {
+    alert("Die Spielernamen müssen eindeutig sein.");
+    return;
+  }
+  speichernSetup({ players: namen });
+  speichernSpiel({ players: namen, rounds: [] });
+  render();
+}
+
+function spielerAendernMitten() {
+  if (confirm("Laufendes Spiel verwerfen und Spieler/Anzahl neu einrichten? Der Fortschritt geht verloren und wird nicht im Verlauf gespeichert.")) {
+    speichernSpiel({ players: [], rounds: [] });
+    render();
+  }
+}
+
+// ---- Runden ----
+
 function rundeSpeichern() {
+  const spiel = ladenSpiel();
   const werte = {};
-  for (const name of SPIELER) {
-    const roh = document.getElementById("input-" + name).value;
+  for (let i = 0; i < spiel.players.length; i++) {
+    const name = spiel.players[i];
+    const roh = document.getElementById("input-" + i).value;
     if (!istGueltigePunktzahl(roh)) {
       alert(`Bitte für ${name} eine gültige Punktzahl (0 oder größer) eingeben.`);
       return;
     }
     werte[name] = parseInt(roh.trim(), 10);
   }
-
-  const spiel = ladenSpiel();
   spiel.rounds.push(werte);
   speichernSpiel(spiel);
   render();
@@ -285,8 +447,8 @@ function rundeBearbeiten(index) {
   const runde = spiel.rounds[index];
   const neu = {};
 
-  for (const name of SPIELER) {
-    const eingabe = prompt(`${name} – Punkte für Runde ${index + 1}:`, runde[name].toString());
+  for (const name of spiel.players) {
+    const eingabe = prompt(`${name} – Punkte für Runde ${index + 1}:`, (runde[name] ?? 0).toString());
     if (eingabe === null) return;
     if (!istGueltigePunktzahl(eingabe)) {
       alert(`Ungültige Punktzahl für ${name}.`);
@@ -302,25 +464,39 @@ function rundeBearbeiten(index) {
 
 function spielZuruecksetzen() {
   if (confirm("Aktuelles Spiel wirklich zurücksetzen? Es wird nicht im Verlauf gespeichert.")) {
-    speichernSpiel({ rounds: [] });
+    const spiel = ladenSpiel();
+    speichernSpiel({ players: spiel.players, rounds: [] });
     render();
   }
 }
 
-function neuesSpielStarten() {
-  const spiel = ladenSpiel();
-  const totals = berechneTotals(spiel.rounds);
-  const rangliste = berechneRangliste(totals);
+// ---- Spielende ----
 
+function archivSpiel(spiel) {
+  const totals = berechneTotals(spiel.players, spiel.rounds);
+  const rangliste = berechneRangliste(spiel.players, totals);
   const historie = ladenHistorie();
   historie.unshift({
     datum: new Date().toLocaleDateString("de-DE"),
+    players: spiel.players,
     rounds: spiel.rounds,
     totals,
     rangliste
   });
   speichernHistorie(historie);
-  speichernSpiel({ rounds: [] });
+}
+
+function neuesSpielGleicheSpieler() {
+  const spiel = ladenSpiel();
+  archivSpiel(spiel);
+  speichernSpiel({ players: spiel.players, rounds: [] });
+  render();
+}
+
+function neueSpielerEinrichten() {
+  const spiel = ladenSpiel();
+  archivSpiel(spiel);
+  speichernSpiel({ players: [], rounds: [] });
   render();
 }
 
@@ -331,40 +507,81 @@ function historieLoeschen() {
   }
 }
 
-function render() {
-  const spiel = ladenSpiel();
+// ---- Anleitung ----
+
+function anleitungOeffnen() {
+  document.getElementById("anleitungOverlay").style.display = "flex";
+}
+function anleitungSchliessen() {
+  document.getElementById("anleitungOverlay").style.display = "none";
+}
+function anleitungSchliessenBeiOverlay(event) {
+  if (event.target.id === "anleitungOverlay") anleitungSchliessen();
+}
+
+// ---- Rendering ----
+
+function renderSetup() {
+  document.getElementById("subtitle").textContent = "Neues Spiel einrichten";
+
+  const statsEl = document.getElementById("stats");
+  statsEl.style.display = "none";
+  statsEl.innerHTML = "";
+
+  const setup = ladenSetup();
+  const formEl = document.getElementById("formBereich");
+  formEl.innerHTML = `
+    <div class="card">
+      <h3>Spieler einrichten</h3>
+      <div class="field">
+        <label>Anzahl Spieler (${MIN_SPIELER}–${MAX_SPIELER})</label>
+        <input id="setupAnzahl" type="number" inputmode="numeric" min="${MIN_SPIELER}" max="${MAX_SPIELER}" step="1"
+               value="${setup.players.length || MIN_SPIELER}" oninput="setupNamenAktualisieren()">
+      </div>
+      <div id="setupNamen"></div>
+      <button class="btn-primary" onclick="setupSpielStarten()">Spiel starten</button>
+    </div>
+  `;
+  setupNamenAktualisieren(setup.players);
+
+  document.getElementById("rundenSection").style.display = "none";
+  document.getElementById("resetBereich").innerHTML = "";
+}
+
+function renderSpiel(spiel) {
+  document.getElementById("stats").style.display = "grid";
+  document.getElementById("rundenSection").style.display = "";
+
   const rounds = spiel.rounds;
+  const players = spiel.players;
   const fertig = rounds.length >= RUNDEN_ZIEL;
-  const totals = berechneTotals(rounds);
-  const rangliste = berechneRangliste(totals);
+  const totals = berechneTotals(players, rounds);
+  const rangliste = berechneRangliste(players, totals);
 
   document.getElementById("subtitle").textContent = fertig
-    ? "Spiel beendet – 10 von 10 Runden"
+    ? `Spiel beendet – ${RUNDEN_ZIEL} von ${RUNDEN_ZIEL} Runden`
     : `Runde ${rounds.length + 1} von ${RUNDEN_ZIEL}`;
 
-  // Stats
   const statsEl = document.getElementById("stats");
-  const fuehrender = rounds.length > 0 ? Math.min(...rangliste.map(r => r.platz)) : null;
-  statsEl.innerHTML = SPIELER.map(name => {
+  statsEl.innerHTML = players.map(name => {
     const eintrag = rangliste.find(r => r.name === name);
     const istFuehrend = rounds.length > 0 && eintrag.platz === 1;
     return `
       <div class="stat ${istFuehrend ? "leader" : ""}">
         <div class="val">${totals[name]}</div>
-        <div class="lbl">${name}${istFuehrend ? " 👑" : ""}</div>
+        <div class="lbl">${escapeHtml(name)}${istFuehrend ? " 👑" : ""}</div>
       </div>`;
   }).join("");
 
-  // Formular oder Ergebnis
   const formEl = document.getElementById("formBereich");
   if (!fertig) {
     formEl.innerHTML = `
       <div class="card">
         <h3>Punkte für Runde ${rounds.length + 1}</h3>
-        ${SPIELER.map(name => `
+        ${players.map((name, i) => `
           <div class="field">
-            <label>${name}</label>
-            <input id="input-${name}" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
+            <label>${escapeHtml(name)}</label>
+            <input id="input-${i}" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
           </div>
         `).join("")}
         <button class="btn-primary" onclick="rundeSpeichern()">Speichern</button>
@@ -379,22 +596,22 @@ function render() {
           ${rangliste.map(r => `
             <div class="rang-zeile ${r.platz === 1 ? "erster" : ""}">
               <div class="platz">${medaille(r.platz) || (r.platz + ".")}</div>
-              <div class="name">${r.name}</div>
+              <div class="name">${escapeHtml(r.name)}</div>
               <div class="punkte">${r.total} Pkt.</div>
             </div>
           `).join("")}
         </div>
-        <button class="btn-primary" onclick="neuesSpielStarten()">Neues Spiel starten</button>
+        <button class="btn-primary" onclick="neuesSpielGleicheSpieler()">Gleiche Spieler nochmal</button>
+        <button class="btn-secondary" onclick="neueSpielerEinrichten()">Neue Spieler einrichten</button>
       </div>
     `;
   }
 
-  // Runden-Liste
   const rundenEl = document.getElementById("rundenListe");
   if (rounds.length === 0) {
     rundenEl.innerHTML = `<div class="empty">Noch keine Runde eingetragen.</div>`;
   } else {
-    rundenEl.innerHTML = [...rounds].map((r, i) => i).reverse().map(i => {
+    rundenEl.innerHTML = rounds.map((_, i) => i).reverse().map(i => {
       const r = rounds[i];
       return `
         <div class="entry-card">
@@ -403,8 +620,8 @@ function render() {
             <button class="btn-edit" onclick="rundeBearbeiten(${i})">✎ Bearbeiten</button>
           </div>
           <div class="entry-grid">
-            ${SPIELER.map(name => `
-              <div class="item"><span>${name}</span><b>${r[name]}</b></div>
+            ${players.map(name => `
+              <div class="item"><span>${escapeHtml(name)}</span><b>${r[name] ?? 0}</b></div>
             `).join("")}
           </div>
         </div>
@@ -412,13 +629,18 @@ function render() {
     }).join("");
   }
 
-  // Reset-Bereich
   const resetEl = document.getElementById("resetBereich");
-  resetEl.innerHTML = rounds.length > 0
-    ? `<button class="btn-danger" onclick="spielZuruecksetzen()">Aktuelles Spiel zurücksetzen</button>`
-    : "";
+  if (rounds.length > 0 && !fertig) {
+    resetEl.innerHTML = `
+      <button class="btn-danger" onclick="spielZuruecksetzen()">Aktuelles Spiel zurücksetzen</button>
+      <button class="btn-danger" onclick="spielerAendernMitten()">Spieler/Anzahl ändern</button>
+    `;
+  } else {
+    resetEl.innerHTML = "";
+  }
+}
 
-  // Verlauf
+function renderHistorie() {
   const historie = ladenHistorie();
   const histEl = document.getElementById("historie");
   if (historie.length === 0) {
@@ -427,12 +649,12 @@ function render() {
     histEl.innerHTML = historie.map(spiel => `
       <div class="entry-card">
         <div class="entry-header">
-          <div class="titel">🏆 ${spiel.rangliste[0].name}</div>
+          <div class="titel">🏆 ${escapeHtml(spiel.rangliste[0].name)}</div>
           <div class="date">${spiel.datum}</div>
         </div>
         <div class="entry-grid">
           ${spiel.rangliste.map(r => `
-            <div class="item"><span>${medaille(r.platz)} ${r.name}</span><b>${r.total}</b></div>
+            <div class="item"><span>${medaille(r.platz)} ${escapeHtml(r.name)}</span><b>${r.total}</b></div>
           `).join("")}
         </div>
       </div>
@@ -443,6 +665,16 @@ function render() {
   histAktionenEl.innerHTML = historie.length > 0
     ? `<button class="btn-danger" onclick="historieLoeschen()">Verlauf löschen</button>`
     : "";
+}
+
+function render() {
+  const spiel = ladenSpiel();
+  if (!spiel.players || spiel.players.length === 0) {
+    renderSetup();
+  } else {
+    renderSpiel(spiel);
+  }
+  renderHistorie();
 }
 
 render();
