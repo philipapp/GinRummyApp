@@ -1,6 +1,6 @@
 {
-  "name": "Gin Rummy Punkte",
-  "short_name": "Gin Rummy",
+  "name": "Gin Punkte",
+  "short_name": "Gin",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b0c10",

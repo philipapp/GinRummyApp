@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<title>Gin Rummy Punkte</title>
+<title>Gin Punkte</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Gin Rummy">
+<meta name="apple-mobile-web-app-title" content="Gin">
 <meta name="theme-color" content="#0b0c10">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="favicon.png">
@@ -262,7 +262,7 @@
 <body>
 
 <div class="header-row">
-  <h1>🃏 Gin Rummy</h1>
+  <h1>🃏 Gin</h1>
   <button class="btn-help" onclick="anleitungOeffnen()" aria-label="Anleitung anzeigen">?</button>
 </div>
 <div class="subtitle" id="subtitle"></div>
@@ -305,8 +305,8 @@
 <script>
 const RUNDEN_ZIEL = 10;
 const MIN_SPIELER = 2;
+const STANDARD_ANZAHL = 3;
 const MAX_SPIELER = 6;
-const STANDARD_SPIELER = ["Kieron", "Staben", "Philip"];
 const SPIEL_KEY = "ginAktuellesSpiel";
 const HISTORIE_KEY = "ginHistorie";
 const SETUP_KEY = "ginSpielerSetup";
@@ -317,13 +317,14 @@ function escapeHtml(str) {
   }[ch]));
 }
 
+// Es zählt nur als laufendes Spiel, wenn explizit Spieler eingerichtet wurden.
+// Ohne das (z.B. beim allerersten Start) wird immer das Setup verlangt.
 function ladenSpiel() {
   const roh = JSON.parse(localStorage.getItem(SPIEL_KEY) || "null");
-  if (!roh || !Array.isArray(roh.rounds)) return { players: [], rounds: [] };
-  if (Array.isArray(roh.players) && roh.players.length > 0) return roh;
-  // Migration: altes Format (vor Multi-Spieler-Update) ohne "players"-Feld
-  if (roh.rounds.length > 0) return { players: [...STANDARD_SPIELER], rounds: roh.rounds };
-  return { players: [], rounds: [] };
+  if (!roh || !Array.isArray(roh.rounds) || !Array.isArray(roh.players) || roh.players.length === 0) {
+    return { players: [], rounds: [] };
+  }
+  return roh;
 }
 function speichernSpiel(spiel) {
   localStorage.setItem(SPIEL_KEY, JSON.stringify(spiel));
@@ -337,7 +338,7 @@ function speichernHistorie(h) {
 function ladenSetup() {
   const roh = JSON.parse(localStorage.getItem(SETUP_KEY) || "null");
   if (roh && Array.isArray(roh.players) && roh.players.length > 0) return roh;
-  return { players: [...STANDARD_SPIELER] };
+  return { players: new Array(STANDARD_ANZAHL).fill("") };
 }
 function speichernSetup(setup) {
   localStorage.setItem(SETUP_KEY, JSON.stringify(setup));
