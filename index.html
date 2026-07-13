@@ -89,7 +89,7 @@
     margin-bottom: 6px;
     font-weight: 600;
   }
-  input {
+  input, select {
     width: 100%;
     background: var(--card-2);
     border: none;
@@ -98,8 +98,15 @@
     font-size: 17px;
     color: var(--text);
     outline: none;
+    font-family: inherit;
   }
-  input:focus { box-shadow: 0 0 0 2px var(--accent); }
+  input:focus, select:focus { box-shadow: 0 0 0 2px var(--accent); }
+  select { appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239a9ba3'><path d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%239a9ba3' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 40px;
+  }
   button {
     width: 100%;
     border: none;
@@ -257,12 +264,6 @@
   }
   .anleitung-liste li { margin-bottom: 10px; }
   .anleitung-liste li:last-child { margin-bottom: 0; }
-  .hinweis {
-    color: var(--text-dim);
-    font-size: 14px;
-    margin: 0 0 16px;
-    line-height: 1.5;
-  }
 </style>
 </head>
 <body>
@@ -301,8 +302,7 @@
       <li>Ein Spiel dauert 10 Runden. Nach jeder Runde trägst du für jeden Spieler den <b>Rest</b> ein – also die Punkte der Karten, die er noch auf der Hand hat.</li>
       <li>Wer nach 10 Runden insgesamt die <b>wenigsten</b> Punkte hat, gewinnt.</li>
       <li>Bereits eingetragene Runden lassen sich jederzeit über „✎ Bearbeiten“ korrigieren, falls du dich vertippt hast.</li>
-      <li>Nach der 10. Runde siehst du das Endergebnis und kannst entweder mit denselben Spielern weiterspielen oder neue Spieler bzw. eine andere Anzahl einrichten.</li>
-      <li>Mitten im Spiel lässt sich über „Spieler/Anzahl ändern“ auch neu einrichten, falls doch noch wer dazukommt – der laufende Fortschritt geht dabei verloren.</li>
+      <li>Namen und Anzahl lassen sich während der 10 Runden nicht mehr ändern – erst nach der 10. Runde siehst du das Endergebnis und kannst entweder mit denselben Spielern weiterspielen oder neue Spieler bzw. eine andere Anzahl einrichten.</li>
       <li>Abgeschlossene Spiele bleiben unten im Verlauf gespeichert.</li>
     </ol>
   </div>
@@ -404,26 +404,9 @@ function clampAnzahl(wert) {
 
 // ---- Spieler-Einrichtung ----
 
-// Überspringt einmalig die Vorspiel-Auswahl und zeigt direkt das volle
-// Einrichten-Formular (z.B. nachdem "Neue Spieler einrichten" angeklickt wurde).
-let zeigeSofortFormular = false;
-
-function vorspielWeiterMitLetzten() {
-  const setup = ladenSetup();
-  speichernSpiel({ players: setup.players, rounds: [] });
-  sitzungBestaetigen();
-  render();
-}
-
-function vorspielNeueSpieler() {
-  zeigeSofortFormular = true;
-  render();
-}
-
 function setupNamenAktualisieren(vorbelegung) {
-  const anzahlInput = document.getElementById("setupAnzahl");
-  const anzahl = clampAnzahl(anzahlInput.value);
-  anzahlInput.value = anzahl;
+  const anzahlSelect = document.getElementById("setupAnzahl");
+  const anzahl = clampAnzahl(anzahlSelect.value);
 
   const bestehende = vorbelegung || [...document.querySelectorAll(".setup-name-input")].map(i => i.value);
   const namenEl = document.getElementById("setupNamen");
@@ -453,14 +436,6 @@ function setupSpielStarten() {
   speichernSpiel({ players: namen, rounds: [] });
   sitzungBestaetigen();
   render();
-}
-
-function spielerAendernMitten() {
-  if (confirm("Laufendes Spiel verwerfen und Spieler/Anzahl neu einrichten? Der Fortschritt geht verloren und wird nicht im Verlauf gespeichert.")) {
-    speichernSpiel({ players: [], rounds: [] });
-    zeigeSofortFormular = true;
-    render();
-  }
 }
 
 // ---- Runden ----
@@ -538,7 +513,6 @@ function neueSpielerEinrichten() {
   const spiel = ladenSpiel();
   archivSpiel(spiel);
   speichernSpiel({ players: [], rounds: [] });
-  zeigeSofortFormular = true;
   render();
 }
 
@@ -563,7 +537,9 @@ function anleitungSchliessenBeiOverlay(event) {
 
 // ---- Rendering ----
 
-function renderVorspiel() {
+function renderSetup() {
+  document.getElementById("subtitle").textContent = "Neues Spiel einrichten";
+
   const statsEl = document.getElementById("stats");
   statsEl.style.display = "none";
   statsEl.innerHTML = "";
@@ -571,40 +547,25 @@ function renderVorspiel() {
   document.getElementById("resetBereich").innerHTML = "";
 
   const setup = ladenSetup();
-  const hatLetzteSpieler = setup.players.some(n => n.trim() !== "");
-
-  if (hatLetzteSpieler && !zeigeSofortFormular) {
-    document.getElementById("subtitle").textContent = "Neues Spiel";
-    document.getElementById("formBereich").innerHTML = `
-      <div class="card">
-        <h3>Bereit für ein neues Spiel?</h3>
-        <p class="hinweis">Zuletzt gespielt: ${escapeHtml(setup.players.join(", "))}</p>
-        <button class="btn-primary" onclick="vorspielWeiterMitLetzten()">Weiter mit diesen Spielern</button>
-        <button class="btn-secondary" onclick="vorspielNeueSpieler()">Neue Spieler einrichten</button>
-      </div>
-    `;
-  } else {
-    renderSetupFormular(setup.players);
+  const anzahlVorbelegt = clampAnzahl(setup.players.length || MIN_SPIELER);
+  const optionen = [];
+  for (let n = MIN_SPIELER; n <= MAX_SPIELER; n++) {
+    optionen.push(`<option value="${n}" ${n === anzahlVorbelegt ? "selected" : ""}>${n} Spieler</option>`);
   }
-  zeigeSofortFormular = false;
-}
 
-function renderSetupFormular(vorbelegungNamen) {
-  document.getElementById("subtitle").textContent = "Neues Spiel einrichten";
   const formEl = document.getElementById("formBereich");
   formEl.innerHTML = `
     <div class="card">
       <h3>Spieler einrichten</h3>
       <div class="field">
-        <label>Anzahl Spieler (${MIN_SPIELER}–${MAX_SPIELER})</label>
-        <input id="setupAnzahl" type="number" inputmode="numeric" min="${MIN_SPIELER}" max="${MAX_SPIELER}" step="1"
-               value="${vorbelegungNamen.length || MIN_SPIELER}" oninput="setupNamenAktualisieren()">
+        <label>Anzahl Spieler</label>
+        <select id="setupAnzahl" onchange="setupNamenAktualisieren()">${optionen.join("")}</select>
       </div>
       <div id="setupNamen"></div>
       <button class="btn-primary" onclick="setupSpielStarten()">Spiel starten</button>
     </div>
   `;
-  setupNamenAktualisieren(vorbelegungNamen);
+  setupNamenAktualisieren(setup.players);
 }
 
 function renderSpiel(spiel) {
@@ -689,14 +650,9 @@ function renderSpiel(spiel) {
   }
 
   const resetEl = document.getElementById("resetBereich");
-  if (rounds.length > 0 && !fertig) {
-    resetEl.innerHTML = `
-      <button class="btn-danger" onclick="spielZuruecksetzen()">Aktuelles Spiel zurücksetzen</button>
-      <button class="btn-danger" onclick="spielerAendernMitten()">Spieler/Anzahl ändern</button>
-    `;
-  } else {
-    resetEl.innerHTML = "";
-  }
+  resetEl.innerHTML = (rounds.length > 0 && !fertig)
+    ? `<button class="btn-danger" onclick="spielZuruecksetzen()">Aktuelles Spiel zurücksetzen</button>`
+    : "";
 }
 
 function renderHistorie() {
@@ -729,7 +685,7 @@ function renderHistorie() {
 function render() {
   const spiel = ladenSpiel();
   if (!spiel.gestartet) {
-    renderVorspiel();
+    renderSetup();
   } else {
     renderSpiel(spiel);
   }
